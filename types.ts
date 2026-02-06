@@ -6,6 +6,7 @@ export interface Exercise {
   reps: number;
   weight: number;
   muscleGroup: string;
+  completedSets?: boolean[]; // Track which sets are finished
 }
 
 export interface CardioActivity {
@@ -14,6 +15,7 @@ export interface CardioActivity {
   duration: number; // minutes
   distance?: number; // km
   intensity: 'Low' | 'Moderate' | 'High';
+  completed?: boolean;
 }
 
 export interface Workout {
@@ -33,7 +35,7 @@ export interface NutritionInfo {
   carbs: number;
   fat: number;
   confidence: number;
-  date?: string; // Added date to meals for calendar tracking
+  date?: string;
 }
 
 export interface AIAnalysis {

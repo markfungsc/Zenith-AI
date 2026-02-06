@@ -1,111 +1,133 @@
 
 import { Workout, NutritionInfo, UserProfile, SavedPlan } from "../types";
+import { supabase, getCurrentUser } from "./supabaseClient";
 
 /**
- * DATABASE INTEGRATION GUIDE:
- * To use a real database (like Supabase or a custom REST API):
- * 1. Install the client (e.g., `npm install @supabase/supabase-js`)
- * 2. Initialize it: const supabase = createClient(URL, KEY)
- * 3. Replace the 'localStorage' calls below with 'await supabase.from(...)...'
+ * USER-SCOPED DATABASE INTEGRATION:
+ * All methods now fetch the current authenticated user first.
+ * Tables are expected to have a 'user_id' column for scoping.
  */
-
-const API_ENABLED = false; // Set to true when your backend is ready
-const BASE_URL = 'https://your-api-endpoint.com/api';
-
-const KEYS = {
-  WORKOUTS: 'zenith_workouts',
-  MEALS: 'zenith_meals',
-  PROFILE: 'zenith_profile',
-  PLANS: 'zenith_plans'
-};
 
 export const db = {
   // --- Profile ---
-  getProfile: async (): Promise<UserProfile> => {
-    if (API_ENABLED) {
-      const res = await fetch(`${BASE_URL}/profile`);
-      return res.json();
+  getProfile: async (): Promise<UserProfile | null> => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('data')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !data) {
+        return {
+          name: user.email?.split('@')[0] || 'Athlete',
+          height: '',
+          weight: '75',
+          oneRepMax: {},
+          eightRepMax: {},
+          goal: 'Build Muscle'
+        };
+      }
+      return data.data as UserProfile;
+    } catch (e) {
+      console.error("Supabase Profile Fetch Error:", e);
+      return null;
     }
-    const data = localStorage.getItem(KEYS.PROFILE);
-    return data ? JSON.parse(data) : {
-      name: 'Athlete',
-      height: '',
-      weight: '75',
-      oneRepMax: {},
-      eightRepMax: {},
-      goal: 'Build Muscle'
-    };
   },
+
   saveProfile: async (profile: UserProfile): Promise<void> => {
-    if (API_ENABLED) {
-      await fetch(`${BASE_URL}/profile`, {
-        method: 'POST',
-        body: JSON.stringify(profile)
-      });
-      return;
-    }
-    localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
+    const user = await getCurrentUser();
+    if (!user) return;
+
+    await supabase
+      .from('profiles')
+      .upsert({ id: user.id, data: profile });
   },
 
   // --- Workouts ---
   getWorkouts: async (): Promise<Workout[]> => {
-    if (API_ENABLED) {
-      const res = await fetch(`${BASE_URL}/workouts`);
-      return res.json();
-    }
-    const data = localStorage.getItem(KEYS.WORKOUTS);
-    return data ? JSON.parse(data) : [];
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('data')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+
+    if (error) return [];
+    return (data || []).map(row => row.data as Workout);
   },
+
   saveWorkouts: async (workouts: Workout[]): Promise<void> => {
-    if (API_ENABLED) {
-      // Typically you'd send just the new/updated workout, 
-      // but for this architecture we sync the full array.
-      await fetch(`${BASE_URL}/workouts/sync`, {
-        method: 'POST',
-        body: JSON.stringify({ workouts })
+    const user = await getCurrentUser();
+    const latestWorkout = workouts[workouts.length - 1];
+    if (!user || !latestWorkout) return;
+
+    await supabase
+      .from('workouts')
+      .upsert({ 
+        id: latestWorkout.id, 
+        user_id: user.id, 
+        data: latestWorkout 
       });
-      return;
-    }
-    localStorage.setItem(KEYS.WORKOUTS, JSON.stringify(workouts));
   },
 
   // --- Meals ---
   getMeals: async (): Promise<NutritionInfo[]> => {
-    if (API_ENABLED) {
-      const res = await fetch(`${BASE_URL}/meals`);
-      return res.json();
-    }
-    const data = localStorage.getItem(KEYS.MEALS);
-    return data ? JSON.parse(data) : [];
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('meals')
+      .select('data')
+      .eq('user_id', user.id);
+
+    if (error) return [];
+    return (data || []).map(row => row.data as NutritionInfo);
   },
+
   saveMeals: async (meals: NutritionInfo[]): Promise<void> => {
-    if (API_ENABLED) {
-      await fetch(`${BASE_URL}/meals/sync`, {
-        method: 'POST',
-        body: JSON.stringify({ meals })
+    const user = await getCurrentUser();
+    const latestMeal = meals[meals.length - 1];
+    if (!user || !latestMeal) return;
+
+    await supabase
+      .from('meals')
+      .insert({ 
+        user_id: user.id, 
+        data: latestMeal 
       });
-      return;
-    }
-    localStorage.setItem(KEYS.MEALS, JSON.stringify(meals));
   },
 
   // --- Plans ---
   getPlans: async (): Promise<SavedPlan[]> => {
-    if (API_ENABLED) {
-      const res = await fetch(`${BASE_URL}/plans`);
-      return res.json();
-    }
-    const data = localStorage.getItem(KEYS.PLANS);
-    return data ? JSON.parse(data) : [];
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('plans')
+      .select('data')
+      .eq('user_id', user.id);
+
+    if (error) return [];
+    return (data || []).map(row => row.data as SavedPlan);
   },
+
   savePlans: async (plans: SavedPlan[]): Promise<void> => {
-    if (API_ENABLED) {
-      await fetch(`${BASE_URL}/plans/sync`, {
-        method: 'POST',
-        body: JSON.stringify({ plans })
+    const user = await getCurrentUser();
+    const latestPlan = plans[plans.length - 1];
+    if (!user || !latestPlan) return;
+
+    await supabase
+      .from('plans')
+      .upsert({ 
+        id: latestPlan.id, 
+        user_id: user.id, 
+        data: latestPlan 
       });
-      return;
-    }
-    localStorage.setItem(KEYS.PLANS, JSON.stringify(plans));
   }
 };

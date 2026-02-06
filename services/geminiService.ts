@@ -11,7 +11,7 @@ export const analyzeWorkouts = async (workouts: Workout[], profile: UserProfile)
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview", // Upgraded for complex reasoning
       contents: [{
         parts: [{
           text: `Analyze these workouts for a user with this profile: ${profileData}. Workouts: ${workoutData}. Identify muscle imbalances and provide highly personalized recommendations based on their goals and stats.`
@@ -35,7 +35,6 @@ export const analyzeWorkouts = async (workouts: Workout[], profile: UserProfile)
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Analysis API Error:", error);
-    // Return a safe fallback to prevent app crash
     return {
       muscleImbalances: ["Log more data for deep analysis"],
       recommendations: ["Keep consistent with your training schedule"],
@@ -49,7 +48,7 @@ export const generatePlan = async (profile: UserProfile, frequency: number): Pro
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview", // Upgraded for high-quality complex text generation
       contents: [{
         parts: [{
           text: `Create a ${frequency} day per week fitness plan for this user: ${profileData}. 
@@ -93,6 +92,7 @@ export const generatePlan = async (profile: UserProfile, frequency: number): Pro
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Planner API Error:", error);
+    // Fallback if API fails to prevent white screen
     return [];
   }
 };
@@ -100,7 +100,7 @@ export const generatePlan = async (profile: UserProfile, frequency: number): Pro
 export const analyzeFoodImage = async (base64Image: string): Promise<NutritionInfo> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-flash-preview", // Flash is fine for image captioning/extraction
       contents: {
         parts: [
           { inlineData: { mimeType: "image/jpeg", data: base64Image } },
