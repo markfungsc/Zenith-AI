@@ -1,6 +1,5 @@
-
-import { Workout, NutritionInfo, UserProfile, SavedPlan } from "../types";
-import { supabase, getCurrentUser } from "./supabaseClient";
+import { Workout, NutritionInfo, UserProfile, SavedPlan } from '../types';
+import { supabase, getCurrentUser } from './supabaseClient';
 
 /**
  * USER-SCOPED DATABASE INTEGRATION:
@@ -28,12 +27,12 @@ export const db = {
           weight: '75',
           oneRepMax: {},
           eightRepMax: {},
-          goal: 'Build Muscle'
+          goal: 'Build Muscle',
         };
       }
       return data.data as UserProfile;
     } catch (e) {
-      console.error("Supabase Profile Fetch Error:", e);
+      console.error('Supabase Profile Fetch Error:', e);
       return null;
     }
   },
@@ -42,9 +41,7 @@ export const db = {
     const user = await getCurrentUser();
     if (!user) return;
 
-    await supabase
-      .from('profiles')
-      .upsert({ id: user.id, data: profile });
+    await supabase.from('profiles').upsert({ id: user.id, data: profile });
   },
 
   // --- Workouts ---
@@ -67,13 +64,11 @@ export const db = {
     const latestWorkout = workouts[workouts.length - 1];
     if (!user || !latestWorkout) return;
 
-    await supabase
-      .from('workouts')
-      .upsert({ 
-        id: latestWorkout.id, 
-        user_id: user.id, 
-        data: latestWorkout 
-      });
+    await supabase.from('workouts').upsert({
+      id: latestWorkout.id,
+      user_id: user.id,
+      data: latestWorkout,
+    });
   },
 
   // --- Meals ---
@@ -81,10 +76,7 @@ export const db = {
     const user = await getCurrentUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
-      .from('meals')
-      .select('data')
-      .eq('user_id', user.id);
+    const { data, error } = await supabase.from('meals').select('data').eq('user_id', user.id);
 
     if (error) return [];
     return (data || []).map(row => row.data as NutritionInfo);
@@ -95,12 +87,10 @@ export const db = {
     const latestMeal = meals[meals.length - 1];
     if (!user || !latestMeal) return;
 
-    await supabase
-      .from('meals')
-      .insert({ 
-        user_id: user.id, 
-        data: latestMeal 
-      });
+    await supabase.from('meals').insert({
+      user_id: user.id,
+      data: latestMeal,
+    });
   },
 
   // --- Plans ---
@@ -108,10 +98,7 @@ export const db = {
     const user = await getCurrentUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
-      .from('plans')
-      .select('data')
-      .eq('user_id', user.id);
+    const { data, error } = await supabase.from('plans').select('data').eq('user_id', user.id);
 
     if (error) return [];
     return (data || []).map(row => row.data as SavedPlan);
@@ -122,12 +109,10 @@ export const db = {
     const latestPlan = plans[plans.length - 1];
     if (!user || !latestPlan) return;
 
-    await supabase
-      .from('plans')
-      .upsert({ 
-        id: latestPlan.id, 
-        user_id: user.id, 
-        data: latestPlan 
-      });
-  }
+    await supabase.from('plans').upsert({
+      id: latestPlan.id,
+      user_id: user.id,
+      data: latestPlan,
+    });
+  },
 };

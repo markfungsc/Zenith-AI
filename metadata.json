@@ -1,7 +1,5 @@
 {
   "name": "Copy of Zenith AI Fitness",
   "description": "A comprehensive AI-powered fitness companion for workout logging, muscle imbalance analysis, personalized planning, and instant nutritional food tracking.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "requestFramePermissions": ["camera"]
 }

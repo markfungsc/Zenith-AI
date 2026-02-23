@@ -1,4 +1,3 @@
-
 export interface Exercise {
   id: string;
   name: string;
@@ -46,10 +45,10 @@ export interface AIAnalysis {
 
 export interface PlannerRoutine {
   day: string;
-  exercises: { 
-    name: string; 
-    sets: string; 
-    reps: string; 
+  exercises: {
+    name: string;
+    sets: string;
+    reps: string;
     target: string;
     suggestedWeight?: string;
     suggestedReps?: string;

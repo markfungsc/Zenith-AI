@@ -1,9 +1,16 @@
-
 import React from 'react';
 import { Workout, NutritionInfo, UserProfile } from '../types';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  PieChart, Pie
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
 } from 'recharts';
 import { Flame, Zap, Trophy, Clock, User } from 'lucide-react';
 
@@ -38,13 +45,27 @@ const Dashboard: React.FC<DashboardProps> = ({ workouts, meals, profile }) => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-2">
         <h2 className="text-3xl font-extrabold text-white">Hey, {profile.name}.</h2>
-        <p className="text-slate-400">Current goal: <span className="text-indigo-400 font-bold">{profile.goal}</span></p>
+        <p className="text-slate-400">
+          Current goal: <span className="text-indigo-400 font-bold">{profile.goal}</span>
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<Flame className="text-orange-500" />} label="Calories Today" value={Math.round(totalCalories)} />
-        <StatCard icon={<Trophy className="text-yellow-500" />} label="Workouts" value={totalWorkouts} />
-        <StatCard icon={<User className="text-blue-500" />} label="Weight" value={profile.weight ? `${profile.weight}kg` : '—'} />
+        <StatCard
+          icon={<Flame className="text-orange-500" />}
+          label="Calories Today"
+          value={Math.round(totalCalories)}
+        />
+        <StatCard
+          icon={<Trophy className="text-yellow-500" />}
+          label="Workouts"
+          value={totalWorkouts}
+        />
+        <StatCard
+          icon={<User className="text-blue-500" />}
+          label="Weight"
+          value={profile.weight ? `${profile.weight}kg` : '—'}
+        />
         <StatCard icon={<Zap className="text-purple-500" />} label="Streak" value="5d" />
       </div>
 
@@ -58,11 +79,21 @@ const Dashboard: React.FC<DashboardProps> = ({ workouts, meals, profile }) => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={workoutByDay}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="day" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="day"
+                  stroke="#475569"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  cursor={{fill: '#1e293b'}}
-                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '16px' }}
+                <Tooltip
+                  cursor={{ fill: '#1e293b' }}
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: '16px',
+                  }}
                 />
                 <Bar dataKey="count" fill="#6366f1" radius={[8, 8, 0, 0]} barSize={32} />
               </BarChart>
@@ -92,21 +123,25 @@ const Dashboard: React.FC<DashboardProps> = ({ workouts, meals, profile }) => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '16px' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: '16px',
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-col gap-4 pl-4 min-w-[100px]">
-               {macroData.map(m => (
-                 <div key={m.name} className="flex items-center gap-3">
-                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
-                   <div>
+              {macroData.map(m => (
+                <div key={m.name} className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
+                  <div>
                     <p className="text-[10px] font-black text-slate-500 uppercase">{m.name}</p>
                     <p className="text-sm font-black text-white">{Math.round(m.value)}g</p>
-                   </div>
-                 </div>
-               ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -115,7 +150,15 @@ const Dashboard: React.FC<DashboardProps> = ({ workouts, meals, profile }) => {
   );
 };
 
-const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number }) => (
+const StatCard = ({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+}) => (
   <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 flex flex-col gap-1 shadow-sm">
     <div className="mb-3">{icon}</div>
     <span className="text-[10px] uppercase tracking-widest text-slate-500 font-black">{label}</span>

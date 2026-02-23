@@ -1,64 +1,183 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
-import { Workout, NutritionInfo, AIAnalysis, PlannerRoutine, UserProfile } from "../types";
+import { GoogleGenAI, Type } from '@google/genai';
+import { Workout, NutritionInfo, AIAnalysis, PlannerRoutine, UserProfile } from '../types';
 
 // Initialize AI with the environment API key
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
 
-export const analyzeWorkouts = async (workouts: Workout[], profile: UserProfile): Promise<AIAnalysis> => {
-  const workoutData = JSON.stringify(workouts);
-  const profileData = JSON.stringify(profile);
+// Debug: Check if API key is loaded (remove in production)
+if (typeof window !== 'undefined') {
+  if (!apiKey) {
+    console.error('GEMINI_API_KEY is missing! Please check your .env file and restart the dev server.');
+  }
+}
+
+const ai = new GoogleGenAI({ apiKey });
+
+// Helper function to detect geographic restriction errors
+const isGeographicRestrictionError = (error: any): boolean => {
+  if (!error) return false;
   
+  const errorMessage = error?.message || '';
+  const errorStatus = error?.status;
+  
+  // Parse JSON error message if present
+  let parsedMessage = errorMessage;
+  try {
+    const parsed = JSON.parse(errorMessage);
+    if (parsed?.error?.message) {
+      parsedMessage = parsed.error.message;
+    }
+    if (parsed?.error?.status) {
+      // Check status from parsed JSON
+      if (parsed.error.status === 'FAILED_PRECONDITION') {
+        return true;
+      }
+    }
+  } catch {
+    // Not JSON, use original message
+  }
+  
+  // Check for geographic restriction indicators
+  const hasLocationError = 
+    parsedMessage.includes('location is not supported') ||
+    parsedMessage.includes('FAILED_PRECONDITION') ||
+    parsedMessage.includes('User location is not supported') ||
+    parsedMessage.toLowerCase().includes('location') && parsedMessage.toLowerCase().includes('not supported');
+  
+  // Status 400 with location error typically indicates geographic restriction
+  return (errorStatus === 400 || errorStatus === 403) && hasLocationError;
+};
+
+// User-friendly error message for geographic restrictions
+const GEOGRAPHIC_RESTRICTION_MESSAGE = 
+  'AI features are currently unavailable in your region. ' +
+  'Google Gemini API is not available in all locations. ' +
+  'You can continue using the app with manual data entry. ' +
+  'Consider using a VPN or checking Google AI Studio for supported regions.';
+
+// Test function to verify API connection
+export const testGeminiConnection = async (): Promise<boolean> => {
+  if (!apiKey) {
+    console.error('API Key is missing');
+    return false;
+  }
+
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview", // Upgraded for complex reasoning
-      contents: [{
-        parts: [{
-          text: `Analyze these workouts for a user with this profile: ${profileData}. Workouts: ${workoutData}. Identify muscle imbalances and provide highly personalized recommendations based on their goals and stats.`
-        }]
-      }],
+      model: 'gemini-3-flash-preview',
+      contents: [{ parts: [{ text: 'Say "Hello" in one word.' }] }],
+    });
+
+    if (response.text) {
+      console.log('Gemini API connection test successful:', response.text);
+      return true;
+    }
+    return false;
+  } catch (error: any) {
+    console.error('Gemini API connection test failed:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+    });
+    return false;
+  }
+};
+
+export const analyzeWorkouts = async (
+  workouts: Workout[],
+  profile: UserProfile
+): Promise<AIAnalysis> => {
+  const workoutData = JSON.stringify(workouts);
+  const profileData = JSON.stringify(profile);
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview', // Upgraded for complex reasoning
+      contents: [
+        {
+          parts: [
+            {
+              text: `Analyze these workouts for a user with this profile: ${profileData}. Workouts: ${workoutData}. Identify muscle imbalances and provide highly personalized recommendations based on their goals and stats.`,
+            },
+          ],
+        },
+      ],
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             muscleImbalances: { type: Type.ARRAY, items: { type: Type.STRING } },
             recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-            progressScore: { type: Type.NUMBER, description: "Score from 0 to 100" }
+            progressScore: { type: Type.NUMBER, description: 'Score from 0 to 100' },
           },
-          required: ["muscleImbalances", "recommendations", "progressScore"]
-        }
-      }
+          required: ['muscleImbalances', 'recommendations', 'progressScore'],
+        },
+      },
     });
 
-    if (!response.text) throw new Error("No response text from AI");
+    if (!response.text) throw new Error('No response text from AI');
     return JSON.parse(response.text);
-  } catch (error) {
-    console.error("Analysis API Error:", error);
+  } catch (error: any) {
+    console.error('Analysis API Error:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      status: error?.status,
+      statusText: error?.statusText,
+      apiKeyPresent: !!apiKey,
+    });
+    
+    // Check for geographic restriction
+    if (isGeographicRestrictionError(error)) {
+      console.warn('Geographic restriction detected:', GEOGRAPHIC_RESTRICTION_MESSAGE);
+      // Return fallback data with geographic restriction notice
+      return {
+        muscleImbalances: [
+          'AI analysis unavailable in your region',
+          'Log more data for detailed analysis',
+        ],
+        recommendations: [
+          'AI features are not available in your location',
+          'Keep consistent with your training schedule',
+          'Consider tracking more workouts for better insights',
+        ],
+        progressScore: 50,
+      };
+    }
+    
+    // Return fallback data for other errors
     return {
-      muscleImbalances: ["Log more data for deep analysis"],
-      recommendations: ["Keep consistent with your training schedule"],
-      progressScore: 50
+      muscleImbalances: ['Log more data for deep analysis'],
+      recommendations: ['Keep consistent with your training schedule'],
+      progressScore: 50,
     };
   }
 };
 
-export const generatePlan = async (profile: UserProfile, frequency: number): Promise<PlannerRoutine[]> => {
+export const generatePlan = async (
+  profile: UserProfile,
+  frequency: number
+): Promise<PlannerRoutine[]> => {
   const profileData = JSON.stringify(profile);
-  
+
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview", // Upgraded for high-quality complex text generation
-      contents: [{
-        parts: [{
-          text: `Create a ${frequency} day per week fitness plan for this user: ${profileData}. 
+      model: 'gemini-3-pro-preview', // Upgraded for high-quality complex text generation
+      contents: [
+        {
+          parts: [
+            {
+              text: `Create a ${frequency} day per week fitness plan for this user: ${profileData}. 
           IMPORTANT: Based on their 1Rep Max (1RM) and 8Rep Max (8RM) values, calculate and suggest specific weights and rep ranges for each exercise. 
           If a lift isn't listed in their PRs, estimate a safe starting weight based on their body weight (${profile.weight}kg).
-          Provide the output in JSON format.`
-        }]
-      }],
+          Provide the output in JSON format.`,
+            },
+          ],
+        },
+      ],
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -74,24 +193,42 @@ export const generatePlan = async (profile: UserProfile, frequency: number): Pro
                     sets: { type: Type.STRING },
                     reps: { type: Type.STRING },
                     target: { type: Type.STRING },
-                    suggestedWeight: { type: Type.STRING, description: "Calculated weight in kg based on user PRs" },
-                    suggestedReps: { type: Type.STRING, description: "Target rep range" },
-                    notes: { type: Type.STRING, description: "Why this weight/rep was chosen" }
+                    suggestedWeight: {
+                      type: Type.STRING,
+                      description: 'Calculated weight in kg based on user PRs',
+                    },
+                    suggestedReps: { type: Type.STRING, description: 'Target rep range' },
+                    notes: { type: Type.STRING, description: 'Why this weight/rep was chosen' },
                   },
-                  required: ["name", "sets", "reps", "target", "suggestedWeight"]
-                }
-              }
+                  required: ['name', 'sets', 'reps', 'target', 'suggestedWeight'],
+                },
+              },
             },
-            required: ["day", "exercises"]
-          }
-        }
-      }
+            required: ['day', 'exercises'],
+          },
+        },
+      },
     });
 
-    if (!response.text) throw new Error("No response text from AI");
+    if (!response.text) throw new Error('No response text from AI');
     return JSON.parse(response.text);
-  } catch (error) {
-    console.error("Planner API Error:", error);
+  } catch (error: any) {
+    console.error('Planner API Error:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      status: error?.status,
+      statusText: error?.statusText,
+      apiKeyPresent: !!apiKey,
+    });
+    
+    // Check for geographic restriction
+    if (isGeographicRestrictionError(error)) {
+      console.warn('Geographic restriction detected:', GEOGRAPHIC_RESTRICTION_MESSAGE);
+      // Return empty array - UI should handle this gracefully
+      // Components should show message: "AI plan generation unavailable. Please create plan manually."
+      return [];
+    }
+    
     // Fallback if API fails to prevent white screen
     return [];
   }
@@ -100,15 +237,17 @@ export const generatePlan = async (profile: UserProfile, frequency: number): Pro
 export const analyzeFoodImage = async (base64Image: string): Promise<NutritionInfo> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Flash is fine for image captioning/extraction
+      model: 'gemini-3-flash-preview', // Flash is fine for image captioning/extraction
       contents: {
         parts: [
-          { inlineData: { mimeType: "image/jpeg", data: base64Image } },
-          { text: "Identify the food and estimate the nutritional macros (protein, carbs, fat, calories)." }
-        ]
+          { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+          {
+            text: 'Identify the food and estimate the nutritional macros (protein, carbs, fat, calories).',
+          },
+        ],
       },
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -117,17 +256,37 @@ export const analyzeFoodImage = async (base64Image: string): Promise<NutritionIn
             protein: { type: Type.NUMBER },
             carbs: { type: Type.NUMBER },
             fat: { type: Type.NUMBER },
-            confidence: { type: Type.NUMBER }
+            confidence: { type: Type.NUMBER },
           },
-          required: ["foodName", "calories", "protein", "carbs", "fat"]
-        }
-      }
+          required: ['foodName', 'calories', 'protein', 'carbs', 'fat'],
+        },
+      },
     });
 
-    if (!response.text) throw new Error("No response text from AI");
+    if (!response.text) throw new Error('No response text from AI');
     return JSON.parse(response.text);
-  } catch (error) {
-    console.error("Food Analysis API Error:", error);
+  } catch (error: any) {
+    console.error('Food Analysis API Error:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      status: error?.status,
+      statusText: error?.statusText,
+      apiKeyPresent: !!apiKey,
+    });
+    
+    // Check for geographic restriction
+    if (isGeographicRestrictionError(error)) {
+      console.warn('Geographic restriction detected:', GEOGRAPHIC_RESTRICTION_MESSAGE);
+      // Throw user-friendly error
+      const geoError = new Error(
+        'Food analysis unavailable in your region. ' +
+        'Please enter nutrition information manually. ' +
+        'Google Gemini API is not available in all locations.'
+      );
+      (geoError as any).isGeographicRestriction = true;
+      throw geoError;
+    }
+    
     throw error;
   }
 };
